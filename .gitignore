@@ -1,0 +1,13 @@
+# Virtual envs
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Notebook cache
+.ipynb_checkpoints/
+
+# Data (keep large datasets out of git)
+data/
