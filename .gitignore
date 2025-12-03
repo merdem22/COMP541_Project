@@ -9,9 +9,11 @@ __pycache__/
 # Notebook cache
 .ipynb_checkpoints/
 
-# Data (keep large datasets out of git)
-data/
+# Local OS cruft
+.DS_Store
+
+# Data (keep large datasets out of git) – root-level only
+/data/
 
 # Generated artifacts
 outputs/
-    
