@@ -1,0 +1,22 @@
+data:
+  data_root: data/nuscenes
+  version: v1.0-mini
+  batch_size: 2
+  num_workers: 2
+  shuffle: True
+  camera_channels:
+    - CAM_FRONT
+    - CAM_FRONT_LEFT
+    - CAM_FRONT_RIGHT
+
+model:
+  lidar_bev_channels: 2
+  lidar_feat_channels: 64
+  camera_feat_channels: 64
+  fusion_mode: concat  # concat | cross_attn
+  head_channels: 64
+
+train:
+  max_steps: 10
+  lr: 0.001
+  device: cpu

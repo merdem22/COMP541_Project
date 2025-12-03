@@ -11,3 +11,6 @@ __pycache__/
 
 # Data (keep large datasets out of git)
 data/
+
+# Generated artifacts
+outputs/
