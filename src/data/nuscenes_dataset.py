@@ -87,7 +87,7 @@ class NuScenesDetectionDataset(Dataset):
         if self.load_annotations:
             _, box_list, _ = self.nusc.get_sample_data(
                 sample_data_token,
-                use_flat_vehicle_coordinates=True,
+                use_flat_vehicle_coordinates=False,  # keep boxes in lidar frame to align with BEV
             )
             boxes = [self._box_to_dict(box) for box in box_list]
 
@@ -114,6 +114,7 @@ class NuScenesDetectionDataset(Dataset):
             "translation": box.center.tolist(),  # (x, y, z)
             "size": box.wlh.tolist(),  # (width, length, height)
             "rotation": box.orientation.elements.tolist(),  # quaternion (w, x, y, z)
+            "yaw": float(box.orientation.yaw_pitch_roll[0]),
             "name": box.name,
             "token": box.token,
         }
