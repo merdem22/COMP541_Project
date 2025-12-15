@@ -1,9 +1,10 @@
+# Updated by AI
 from typing import Optional
 
 import torch
 from torch import nn
 from torch.nn import functional as F
-
+from src.models.graph_module_placeholder import StaticGraphModule
 from src.models.backbone_camera import CameraBackbone
 from src.models.backbone_lidar import SimpleLidarBackbone
 
@@ -66,6 +67,10 @@ class SimpleDetectionHead(nn.Module):
             nn.ReLU(inplace=True),
         )
         self.class_head = nn.Conv2d(hidden, num_classes, kernel_size=1)
+        # CenterNet prior: initialize bias so sigmoid outputs ~0.1 initially
+        # This prevents exploding detection counts at the start of training
+        # -2.19 corresponds to sigmoid(-2.19) ≈ 0.1
+        nn.init.constant_(self.class_head.bias, -2.19)
         self.box_head = nn.Conv2d(hidden, 7, kernel_size=1)  # x, y, z, w, l, h, yaw
 
     def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
@@ -87,6 +92,8 @@ class FusionBaselineModel(nn.Module):
         camera_feat_channels: int = 64,
         fusion_mode: str = "concat",
         num_classes: int = 10,
+        use_graph: bool = False,          # <-- NEW
+        graph_k: int = 8,                 # <-- NEW (unused now but nice for later)
     ) -> None:
         super().__init__()
         self.lidar_backbone = SimpleLidarBackbone(
@@ -106,6 +113,13 @@ class FusionBaselineModel(nn.Module):
             self.fusion = ConcatFusion()
             head_in_channels = lidar_feat_channels + camera_feat_channels
 
+        # NEW: graph module after fusion, before detection head
+        self.use_graph = use_graph
+        if use_graph:
+            self.graph = StaticGraphModule(in_channels=head_in_channels, k_neighbors=graph_k)
+        else:
+            self.graph = None
+
         self.head = SimpleDetectionHead(in_channels=head_in_channels, num_classes=num_classes)
 
     def forward(
@@ -115,4 +129,8 @@ class FusionBaselineModel(nn.Module):
     ) -> dict[str, torch.Tensor]:
         lidar_features = self.lidar_backbone(lidar_bev)
         fused = self.fusion(lidar_features, camera_bev)
+
+        if self.graph is not None:
+            fused = self.graph(fused)
+
         return self.head(fused)

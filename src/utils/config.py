@@ -25,6 +25,8 @@ class ModelConfig:
     camera_feat_channels: int = 64
     fusion_mode: str = "concat"  # concat | cross_attn
     head_channels: int = 64
+    use_graph: bool = False
+    graph_k: int = 8
 
 
 @dataclass

@@ -15,8 +15,10 @@ model:
   camera_feat_channels: 64
   fusion_mode: concat  # concat | cross_attn
   head_channels: 64
+  use_graph: True      # Enable the graph module
+  graph_k: 8           # 8-connected neighbors
 
 train:
-  max_steps: 10
+  max_steps: 50
   lr: 0.001
   device: cpu
