@@ -146,6 +146,7 @@ def simple_metrics(
             
             if len(cls_gt_boxes) == 0:
                 # All predictions are false positives
+                per_class_stats[cls_name]['tp'].extend([0] * len(cls_pred_boxes))
                 per_class_stats[cls_name]['fp'].extend([1] * len(cls_pred_boxes))
                 per_class_stats[cls_name]['scores'].extend(cls_pred_scores.tolist())
                 continue
