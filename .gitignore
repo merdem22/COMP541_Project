@@ -1,19 +1,24 @@
-# Virtual envs
-.venv/
-env/
-
-# Python cache
-__pycache__/
-*.pyc
-
-# Notebook cache
-.ipynb_checkpoints/
-
-# Local OS cruft
+# OS / editor
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
 
-# Data (keep large datasets out of git) – root-level only
-/data/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
 
-# Generated artifacts
+# Data / outputs (do not commit)
+nuscenes/
 outputs/
+
+# Model weights / checkpoints
+*.pth
+*.pt
+*.ckpt
+
+# Misc caches
+.cache/

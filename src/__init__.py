@@ -1,3 +1,1 @@
-"""
-Project package marker.
-"""
+# nuscenes_fusion package

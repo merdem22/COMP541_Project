@@ -1,0 +1,135 @@
+# Experiment 2: LiDAR + Camera Baseline
+# Target: 0.20-0.25 mAP @ 0.25 IoU
+# Memory-safe config for 4x V100 (32GB each)
+
+model:
+  use_camera: true
+  use_graph: false
+
+  # BEV grid: 256x256 at 0.4m resolution = 102.4m x 102.4m
+  bev_x_bound: [-51.2, 51.2, 0.4]
+  bev_y_bound: [-51.2, 51.2, 0.4]
+  bev_z_bound: [-5.0, 3.0, 8.0]
+  bev_channels: 128
+
+  # LiDAR backbone
+  lidar:
+    voxel_size: [0.4, 0.4, 8.0]
+    point_cloud_range: [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
+    max_points_per_voxel: 32
+    max_voxels: 30000
+    in_channels: 5
+    encoder_channels: [64, 128]
+    bev_out_channels: 128
+
+  # Camera backbone
+  camera:
+    backbone: "resnet18"
+    pretrained: true
+    downsample: 32
+    depth_channels: 32
+    depth_min: 1.0
+    depth_max: 60.0
+    depth_bins: 32
+    feat_channels: 32
+    bev_out_channels: 128
+    img_size: [256, 512]
+
+  # Graph module (not used)
+  graph:
+    in_channels: 128
+    hidden_channels: 128
+    out_channels: 128
+    num_layers: 1
+    kernel_size: 3
+
+  # Detection head
+  head:
+    in_channels: 128
+    shared_channels: 128
+    num_classes: 10
+    tasks:
+      - num_class: 1
+        class_names: ["car"]
+      - num_class: 2
+        class_names: ["truck", "construction_vehicle"]
+      - num_class: 2
+        class_names: ["bus", "trailer"]
+      - num_class: 1
+        class_names: ["barrier"]
+      - num_class: 2
+        class_names: ["motorcycle", "bicycle"]
+      - num_class: 2
+        class_names: ["pedestrian", "traffic_cone"]
+    common_heads:
+      reg: 2
+      height: 1
+      dim: 3
+      rot: 2
+      vel: 2
+    gaussian_overlap: 0.1
+    min_radius: 2
+    max_objs: 500
+
+data:
+  root: "/datasets/nuscenes"
+  version: "v1.0-trainval"
+  train_split: "train"
+  val_split: "val"
+  num_sweeps: 1
+  sweep_step: 1
+  use_time_lag: false
+  use_camera: true
+  image_norm: true
+  image_mean: [0.485, 0.456, 0.406]
+  image_std: [0.229, 0.224, 0.225]
+  max_points: 200000
+
+wandb:
+  project: "comp541"
+  entity: "merdem22-ko-university"
+
+logging:
+  train_log_interval: 50
+
+training:
+  epochs: 10
+  batch_size: 2
+  # Camera runs can hit host-RAM pressure on SLURM even with large RAM limits.
+  # Set workers=0 for maximum stability; increase later if you see no OOMs.
+  num_workers: 0
+  prefetch_factor: 1
+  persistent_workers: false
+  pin_memory: false
+  # Keep validation lightweight to avoid host OOM on epoch end
+  val_num_workers: 0
+  val_prefetch_factor: 2
+  val_persistent_workers: false
+  metrics_per_epoch: 1
+  train_metrics_batches: 0
+  val_metrics_batches: 100
+  lr: 2.0e-4
+  weight_decay: 0.01
+  warmup_epochs: 2
+  grad_clip: 35.0
+
+  loss_weights:
+    heatmap: 1.0
+    reg: 2.0
+    height: 0.2
+    dim: 0.2
+    rot: 0.2
+    vel: 0.2
+
+  augmentation:
+    random_flip: true
+    global_rot: [-0.3925, 0.3925]
+    global_scale: [0.95, 1.05]
+
+eval:
+  nms_thresh: 0.2
+  score_thresh: 0.1
+  max_dets: 300
+  distance_thresh: 2.0
+  # Optional for faster/safer training-time evaluation:
+  # pre_nms_topk: 1000
