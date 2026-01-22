@@ -1,6 +1,6 @@
 # BEVFusion + Graph: Multi-Modal 3D Object Detection
 
-A PyTorch implementation of multi-modal 3D object detection combining LiDAR and camera inputs with a novel **learnable edge graph module** for BEV feature reasoning.
+PyTorch code for multi-modal 3D object detection on nuScenes using LiDAR-only, LiDAR+Camera fusion, and an optional BEV graph reasoning module.
 
 ## Architecture Overview
 
@@ -53,26 +53,22 @@ A PyTorch implementation of multi-modal 3D object detection combining LiDAR and 
 ## Key Features
 
 - **Multi-Modal Fusion**: Combines LiDAR point clouds and 6 surround-view cameras
-- **Learnable Edge Graph Module**: Novel graph reasoning with learned edge features
-- **Ablation Support**: Can train with or without graph module for comparison
+- **Learnable Edge Graph Module**: Optional graph reasoning on fused BEV features (ablation-friendly)
 - **Efficient Design**: Pillar-based LiDAR encoding + LSS-style camera projection
-- **Multi-GPU Training**: Full DDP support for 4x V100 GPUs
-- **WandB Integration**: Comprehensive logging with per-class metrics
-- **nuScenes Compatible**: Works with keyframes-only dataset
+- **Visualization**: BEV + per-camera 3D box projections for demos
+- **nuScenes Compatible**: Works with `v1.0-trainval` and `v1.0-mini`
 
 ## Installation
 
 ```bash
-# Create environment (or use existing comp541 environment)
-conda activate comp541
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Dataset is available at /datasets/nuscenes (symlinked to data/nuscenes in the repo)
 ```
 
-Keep the codebase under `/home/$USER/nuscenes_fusion`. Training and evaluation outputs will be written to `/scratch/$USER/nuscenes_fusion/outputs`.
+If you’re on a cluster, keep large artifacts (datasets/outputs/checkpoints) on fast storage (e.g. `/scratch`).
+
+## Data
+
+Download nuScenes and point `--root` to the dataset directory. For quick demos, use `v1.0-mini`.
 
 ## Training on Valar HPC
 
@@ -92,15 +88,6 @@ CONFIG=configs/exp2_lidar_camera.yaml sbatch scripts/train.sh
 CONFIG=configs/exp3_lidar_camera_graph.yaml sbatch scripts/train.sh
 ```
 
-### Monitor on WandB
-
-Results will be logged to: `wandb.ai/merdem22-ko-university/comp541`
-
-Key metrics tracked:
-- **Training**: loss (total, heatmap, reg, height, dim, rot, vel), LR, grad norm, throughput
-- **Validation**: precision, recall, F1, mAP, per-class AP
-- **System**: GPU memory, samples/sec
-
 ## Evaluation
 
 ```bash
@@ -113,51 +100,27 @@ CHECKPOINT=/scratch/$USER/nuscenes_fusion/outputs/runs/exp1_lidar_<JOB_ID>/check
 CONFIG=configs/exp1_lidar.yaml sbatch scripts/eval_slurm.sh
 ```
 
-## Configuration
+## Visualization (BEV + Cameras)
 
-Key hyperparameters in `configs/exp1_lidar.yaml`:
+This repository includes a demo-oriented visualization script that:
+- runs inference on a random subset of samples
+- selects “good” and “questionable” samples using a simple proxy (distance-based matching)
+- saves a BEV plot and 6 camera views with projected 3D boxes
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `batch_size` | 2 | Per-GPU batch size |
-| `lr` | 2e-4 | Learning rate |
-| `epochs` | 10 | Training epochs |
-| `bev_x_bound` | [-51.2, 51.2, 0.4] | BEV X range [min, max, res] |
-| `camera.img_size` | [256, 704] | Input image size (H, W) |
-| `camera.depth_bins` | 64 | Depth bins for LSS projection |
-| `graph.num_layers` | 2 | Graph conv layers (exp3) |
-| `data.num_sweeps` | 1 | LiDAR sweeps to fuse (set >1 for multi-sweep) |
-| `data.use_time_lag` | false | Append time-lag channel for multi-sweep |
+Example on `v1.0-mini` (CPU):
 
-## WandB Logging Details
-
-Metrics are logged at different intervals for optimal visualization:
-
-- **Every N batches**: Training loss components, LR, grad norm, throughput (see `logging.train_log_interval`)
-- **End of each epoch**: Validation metrics (precision, recall, F1, mAP, per-class AP)
-- **Optional mid-epoch**: If `training.metrics_per_epoch > 1`
-
-## Graph Module Details
-
-The graph module combines:
-
-1. **Dense Local Graph Attention**: Efficient local reasoning with learnable relative position encoding
-2. **Sparse Global Graph**: k-NN based global context aggregation with learned edge features
-
-Edge features are computed from:
-- Relative spatial positions
-- Feature difference norms
-- Cosine similarity between node features
-
-## Expected Performance
-
-With 4x V100 GPUs and 10 epochs:
-
-| Model | mAP | Training Time |
-|-------|-----|---------------|
-| LiDAR-only (exp1) | 0.18-0.22 | ~14-18h |
-| LiDAR + Camera (exp2) | 0.20-0.25 | ~18-22h |
-| LiDAR + Camera + Graph (exp3) | 0.25-0.30 | ~22-26h |
+```bash
+python scripts/visualize_samples.py \
+  --config configs/exp1_lidar.yaml \
+  --checkpoint /path/to/checkpoint_best.pth \
+  --root /path/to/nuscenes \
+  --version v1.0-mini \
+  --split mini_val \
+  --device cpu \
+  --save-mode demo \
+  --save-cameras \
+  --outdir outputs/vis_demo
+```
 
 ## Project Structure
 
@@ -196,7 +159,6 @@ nuscenes_fusion/
 python train.py --config configs/exp1_lidar.yaml \
                 --output-dir outputs/run1 \
                 --no-graph           # Disable graph module (ablation)
-                --lite               # Use lightweight model
                 --resume checkpoint.pth
 ```
 
@@ -206,36 +168,6 @@ python evaluate.py --checkpoint path/to/checkpoint.pth \
                    --config configs/exp1_lidar.yaml \
                    --no-graph        # For models trained without graph
                    --official        # Use official nuScenes metrics
-```
-
-## Troubleshooting
-
-### Out of Memory
-- Reduce `batch_size` in config
-- Use `--lite` flag for smaller model
-- Reduce `max_points` in data config
-
-### WandB Issues
-- Check WANDB_API_KEY is set
-- Verify entity name: `merdem22-ko-university`
-- Check network connectivity on compute nodes
-
-### Poor Convergence
-- Increase warmup epochs
-- Reduce learning rate
-- Enable gradient clipping (default: 35.0)
-
-## Citation
-
-If this code helps your research, please consider citing:
-
-```bibtex
-@article{bevfusion2022,
-  title={BEVFusion: Multi-Task Multi-Sensor Fusion with Unified Bird's-Eye View Representation},
-  author={Liu, Zhijian and Tang, Haotian and Amini, Alexander and Yang, Xinyu and Mao, Huizi and Rus, Daniela and Han, Song},
-  journal={arXiv preprint arXiv:2205.13542},
-  year={2022}
-}
 ```
 
 ## License
